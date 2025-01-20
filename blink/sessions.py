@@ -3461,6 +3461,7 @@ class ChatSessionItem(object):
     def _NH_BlinkUnreadMessagesChanged(self, notification):
         if self.widget:
             self.widget.update_content(self)
+            notification.center.post_notification('ChatSessionItemDidChange', sender=self)
 
     def _NH_BlinkSessionDidReinitializeForOutgoing(self, notification):
         self.widget.update_content(self)
