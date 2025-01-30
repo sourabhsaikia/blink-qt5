@@ -4,8 +4,8 @@ import pickle as pickle
 import os
 import re
 import uuid
-from PyQt6.QtCore import QTimer
-from PyQt6.QtGui import QIcon
+from PyQt5.QtCore import QTimer
+from PyQt5.QtGui import QIcon
 
 from application.notification import IObserver, NotificationCenter, NotificationData
 from application.python import Null
