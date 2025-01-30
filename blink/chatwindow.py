@@ -13,8 +13,9 @@ from PyQt5 import uic
 from PyQt5.QtCore import Qt, QBuffer, QEasingCurve, QEvent, QPoint, QPointF, QPropertyAnimation, QRect, QRectF, QSettings, QSize, QSizeF, QTimer, QUrl, pyqtSignal, QObject, QFileInfo, pyqtSlot
 from PyQt5.QtGui import QBrush, QColor, QIcon, QImageReader, QKeyEvent, QLinearGradient, QPainter, QPalette, QPen, QPixmap, QPolygonF, QTextCharFormat, QTextCursor, QTextDocument
 from PyQt5.QtGui import QDesktopServices
+from PyQt5.QtWebKit import QWebSettings
+from PyQt5.QtWebKitWidgets import QWebPage as QWebEnginePage, QWebView as QWebEngineView
 from PyQt5.QtWebChannel import QWebChannel
-from PyQt5.QtWebEngineWidgets import QWebEnginePage, QWebEngineView, QWebEngineSettings, QWebEngineScript
 from PyQt5.QtWidgets import QApplication, QAction, QDialog, QDialogButtonBox, QLabel, QListView, QMenu, QStyle, QStyleOption, QStylePainter, QTextEdit, QToolButton, QPlainTextEdit
 from PyQt5.QtWidgets import QFileDialog, QFileIconProvider
 from PyQt5.QtWidgets import QMessageBox
@@ -392,21 +393,21 @@ class ChatWebPage(QWebEnginePage):
 
     def __init__(self, parent=None):
         super(ChatWebPage, self).__init__(parent)
-        disable_actions = {QWebEnginePage.WebAction.OpenLinkInNewBackgroundTab, QWebEnginePage.WebAction.OpenLinkInNewTab, QWebEnginePage.WebAction.OpenLinkInNewWindow,
+        disable_actions = {QWebEnginePage.WebAction.OpenLink, QWebEnginePage.WebAction.OpenLinkInNewWindow,
                            QWebEnginePage.WebAction.OpenLinkInThisWindow,
-                           QWebEnginePage.WebAction.DownloadLinkToDisk, QWebEnginePage.WebAction.DownloadImageToDisk, QWebEnginePage.WebAction.DownloadMediaToDisk,
+                           QWebEnginePage.WebAction.DownloadLinkToDisk, QWebEnginePage.WebAction.DownloadMediaToDisk,
                            QWebEnginePage.WebAction.Back, QWebEnginePage.WebAction.Forward, QWebEnginePage.WebAction.Stop, QWebEnginePage.WebAction.Reload,
-                           QWebEnginePage.WebAction.SavePage, QWebEnginePage.WebAction.ViewSource}
+                           }
         for action in (self.action(action) for action in disable_actions):
             action.setVisible(False)
 
-    def acceptNavigationRequest(self, url, navigation_type, is_main_frame):  # not sure if needed since we already disabled the corresponding actions. (can they be triggered otherwise?)
-        if navigation_type in (QWebEnginePage.NavigationType.NavigationTypeBackForward, QWebEnginePage.NavigationType.NavigationTypeReload):
+    def acceptNavigationRequest(self, frame, request, navigation_type):  # not sure if needed since we already disabled the corresponding actions. (can they be triggered otherwise?)
+        if navigation_type in (QWebEnginePage.NavigationType.NavigationTypeBackOrForward, QWebEnginePage.NavigationType.NavigationTypeReload):
             return False
         elif navigation_type == QWebEnginePage.NavigationType.NavigationTypeLinkClicked:
-            self.linkClicked.emit(url)
+            self.linkClicked.emit(request.url)
             return False
-        return super(ChatWebPage, self).acceptNavigationRequest(url, navigation_type, is_main_frame)
+        return super(ChatWebPage, self).acceptNavigationRequest(frame, request, navigation_type)
 
 
 class ChatWebView(QWebEngineView):
@@ -420,6 +421,7 @@ class ChatWebView(QWebEngineView):
         self.setPalette(palette)
         self.setPage(ChatWebPage(self))
         self.setAttribute(Qt.WidgetAttribute.WA_OpaquePaintEvent, False)
+        self.settings().setAttribute(QWebSettings.DeveloperExtrasEnabled, True)
         self.last_message_id = None
 
     def contextMenuEvent(self, event):
@@ -776,10 +778,8 @@ class ChatJSInterface(QObject):
         self.page = page
         self.loaded = False
         self._js_operations_queue = deque()
-        self.channel = QWebChannel()
-        self.channel.registerObject('chat', self)
-        self.page.setWebChannel(self.channel)
-        # self.page.profile().scripts().insert(self._get_script())
+        self.page.mainFrame().addToJavaScriptWindowObject('chat', self)
+        self.page.mainFrame().javaScriptWindowObjectCleared.connect(self.attach_object)
 
     # Somehow the script gets inserted in every page, for now we load it from html
     def _get_script(self):
@@ -789,6 +789,9 @@ class ChatJSInterface(QObject):
         script.setInjectionPoint(QWebEngineScript.InjectionPoint.DocumentCreation)
         script.setRunsOnSubFrames(True)
         return script
+
+    def attach_object(self):
+        self.page.mainFrame().addToJavaScriptWindowObject('chat', self)
 
     @pyqtSlot(bool)
     def _JH_LoadFinished(self, ok):
@@ -806,9 +809,9 @@ class ChatJSInterface(QObject):
         while self._js_operations_queue:
             operation = self._js_operations_queue.popleft()
             if isinstance(operation, tuple):
-                self.page.runJavaScript(*operation)
+                pass
             else:
-                self.page.runJavaScript(operation)
+                self.page.mainFrame().evaluateJavaScript(operation)
 
     def append_element(self, query, content):
         content = json.dumps(content)
@@ -1005,6 +1008,7 @@ class ChatWidget(base_class, ui_class):
         self.font_size = blink_settings.chat_window.font_size or self.style.font_size
         self.user_icons_css_class = 'show-icons' if blink_settings.chat_window.show_user_icons else 'hide-icons'
         self.chat_view.setHtml(self.chat_template.format(base_url=FileURL(self.style.path) + '/', style_url=self.style_variant + '.css', font_family=self.font_family, font_size=self.font_size), baseUrl=QUrl.fromLocalFile(os.path.abspath(sys.argv[0])))
+        self.chat_element = self.chat_view.page().mainFrame().findFirstElement('#chat')
         self.chat_js = ChatJSInterface(self.chat_view.page())
         self.composing_timer = QTimer()
         self.otr_timer = QTimer()
@@ -1028,7 +1032,7 @@ class ChatWidget(base_class, ui_class):
         self.chat_input.lockReleased.connect(self._SH_ChatInputLockReleased)
         self.chat_view.sizeChanged.connect(self._SH_ChatViewSizeChanged)
 
-        self.chat_view.page().contentsSizeChanged.connect(self._SH_ChatViewFrameContentsSizeChanged)
+        self.chat_view.page().mainFrame().contentsSizeChanged.connect(self._SH_ChatViewFrameContentsSizeChanged)
         self.chat_view.page().linkClicked.connect(self._SH_LinkClicked)
         self.chat_js.contextMenuEvent.connect(self._SH_ContextMenuEvent)
 
@@ -1206,7 +1210,8 @@ class ChatWidget(base_class, ui_class):
             self._scroll_to_bottom()
 
     def _align_chat(self, scroll=False):
-        self.chat_js.get_height_element('#chat', partial(self._process_height, scroll=scroll))
+        content_height = self.chat_element.geometry().height()
+        self._process_height(content_height, scroll=scroll)
 
     def _scroll_to_bottom(self):
         self.chat_js.scroll_to_bottom()
@@ -3554,8 +3559,8 @@ class ChatWindow(base_class, ui_class, ColorHelperMixin):
                 SessionManager().get_file(blink_session.contact, blink_session.contact_uri, file.original_name, file.hash, file.id, account=file.account, conference_file=False)
             else:
                 SessionManager().get_file_from_url(blink_session, file)
-        session.chat_widget._align_chat(True)
         session.chat_widget.show_loading_screen(False)
+        session.chat_widget._align_chat(True)
 
     def _NH_BlinkMessageHistoryLoadDidFail(self, notification):
         blink_session = notification.sender
