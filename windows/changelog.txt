@@ -1,3 +1,29 @@
+blink (6.0.1)
+
+  * Fixed traceback in dragging audio sessions to a conference
+  * Added Logs window
+  * Added Call Transfer menu
+  * Added audio auto-record function
+  * Added outbound account selection gfor message session
+  * Added button to open last unread messages
+  * Added controls to see last transferred files for chat contacts
+  * Added pause/resume for file transfers
+  * Added support to remove conversations
+  * Restore chat window if minimized
+  * Use default conference as conference server, local domain will be appended
+  * PGP decryption/encryption fixes
+  * TLS verification fixes
+  * Message rendering fixes
+  * Message session fixes
+  * Sylk-Server API messages replication fixes
+  * Silence all audio notifications if Disable ringtones button pressed
+  * Fixed updating codecs if SDK defaults have changed
+  * Throttle incoming message audio notifications
+  * Throttle desktop notifications for messages
+  * Refactored file transfers
+  * Refresh audio devices when open the Devices menu
+  * Make app compatible with MacOS
+
 blink (5.9.1)
 
   * Fixed session selection in chat window

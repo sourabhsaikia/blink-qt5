@@ -27,7 +27,6 @@ blink (6.0.0) unstable; urgency=medium
   * Throttle desktop notifications for messages
   * Refactored file transfers
   * Refresh audio devices when open the Devices menu
-  * Fixes for PyQt6 migration
   * Make app compatible with MacOS
 
  -- Tijmen de Mes <tijmen@ag-projects.com>  Tue, 28 Jan 2025 14:32:19 +0100
@@ -43,8 +42,6 @@ blink (5.9.1) unstable; urgency=medium
 
 blink (5.9.0) unstable; urgency=medium
 
-  * Migrate code for QT6 compatibilty
-  * Refactored web views to use latest QWebEngine
   * Chat window only opens on user interactions
   * Improved MacOS compatibilty
   * Implemented persistent Bonjour messaging
