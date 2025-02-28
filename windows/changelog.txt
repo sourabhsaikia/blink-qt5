@@ -1,3 +1,7 @@
+blink (6.0.2)
+
+  * Fix requesting Sylk API token
+
 blink (6.0.1)
 
   * Fixed traceback in dragging audio sessions to a conference
