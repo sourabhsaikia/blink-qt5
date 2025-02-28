@@ -1,6 +1,7 @@
-blink (6.0.2)
+blink (6.0.3)
 
   * Fix requesting Sylk API token
+  * Fixed updater
 
 blink (6.0.1)
 
